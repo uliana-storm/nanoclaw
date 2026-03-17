@@ -548,6 +548,30 @@ async function main(): Promise<void> {
         return;
       }
 
+      // Auto-register new Slack DMs as personal groups.
+      // Each user who DMs the bot gets their own isolated context (memory, container, tasks).
+      if (
+        chatJid.startsWith('slack:D') &&
+        !registeredGroups[chatJid] &&
+        !msg.is_from_me &&
+        !msg.is_bot_message
+      ) {
+        const userId = msg.sender; // Slack user ID (e.g. U0123456789) — unique per user
+        const displayName = msg.sender_name || userId;
+        const safeName = userId.toLowerCase().replace(/[^a-z0-9]/g, '-');
+        registerGroup(chatJid, {
+          name: displayName,
+          folder: `slack_${safeName}`,
+          trigger: `@${ASSISTANT_NAME}`,
+          requiresTrigger: false,
+          added_at: new Date().toISOString(),
+        });
+        logger.info(
+          { chatJid, name: displayName, folder: `slack_${safeName}` },
+          'Auto-registered new Slack DM as personal group',
+        );
+      }
+
       // Sender allowlist drop mode: discard messages from denied senders before storing
       if (!msg.is_from_me && !msg.is_bot_message && registeredGroups[chatJid]) {
         const cfg = loadSenderAllowlist();
